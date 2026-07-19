@@ -1,0 +1,56 @@
+{
+  "enabled": {
+    "description": "启用图片格式转换",
+    "type": "bool",
+    "hint": "开启后，非 PNG/JPEG 图片会在交给模型前自动转为 PNG。",
+    "default": true
+  },
+  "convert_message_images": {
+    "description": "转换消息中的图片",
+    "type": "bool",
+    "hint": "在收到消息时尽早转换，可避免图片描述/压缩阶段因 GIF 等格式失败。",
+    "default": true
+  },
+  "convert_request_images": {
+    "description": "转换请求中的图片",
+    "type": "bool",
+    "hint": "在 LLM 请求阶段再次检查 image_urls，作为兜底。",
+    "default": true
+  },
+  "keep_alpha": {
+    "description": "保留透明通道",
+    "type": "bool",
+    "hint": "转为 PNG 时尽量保留透明度；关闭则统一铺白底。",
+    "default": true
+  },
+  "animated_expand": {
+    "description": "动图展开为逐帧拼贴",
+    "type": "bool",
+    "hint": "开启后，GIF/动态 WebP 会按时间顺序展开成一张包含多帧的静态拼贴 PNG，便于模型理解动画内容。关闭则只取第一帧。",
+    "default": true
+  },
+  "max_frames": {
+    "description": "最多保留帧数",
+    "type": "int",
+    "hint": "动图超过该帧数时会均匀采样，避免拼贴图过大。",
+    "default": 24
+  },
+  "contact_sheet_columns": {
+    "description": "拼贴列数",
+    "type": "int",
+    "hint": "逐帧拼贴图的列数，从左到右、从上到下排列。",
+    "default": 4
+  },
+  "max_cell_size": {
+    "description": "单帧最大边长",
+    "type": "int",
+    "hint": "拼贴中每一帧缩放到该边长以内（像素）。",
+    "default": 256
+  },
+  "show_frame_labels": {
+    "description": "显示帧编号",
+    "type": "bool",
+    "hint": "在每帧下方标注原始帧号和时长，帮助模型理解顺序。",
+    "default": true
+  }
+}

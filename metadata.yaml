@@ -1,0 +1,17 @@
+name: astrbot_plugin_image_to_png
+display_name: 图片转 PNG
+desc: 在提交给大模型前检查图片格式；PNG/JPEG 原样放行；GIF 等动图展开为逐帧拼贴静态 PNG，兼容 QQ 表情包。
+version: 1.1.0
+author: Xiawan
+repo: https://github.com/BCXW-0/astrbot_plugin_image-to-PNG
+astrbot_version: ">=4.16.0"
+support_platforms:
+  - aiocqhttp
+  - qq_official
+  - telegram
+  - wecom
+  - lark
+  - dingtalk
+  - kook
+  - webchat
+  - discord
