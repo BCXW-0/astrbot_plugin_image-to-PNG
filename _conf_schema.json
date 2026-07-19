@@ -52,5 +52,41 @@
     "type": "bool",
     "hint": "在每帧下方标注原始帧号和时长，帮助模型理解顺序。",
     "default": true
+  },
+  "cache_enabled": {
+    "description": "启用哈希缓存",
+    "type": "bool",
+    "hint": "按图片内容 SHA256 + 转换参数识别重复表情包，命中则直接复用已转换 PNG。",
+    "default": true
+  },
+  "cache_ttl_days": {
+    "description": "缓存保留天数",
+    "type": "int",
+    "hint": "以最后访问时间为准，超过该天数的缓存会在定时/手动清理时删除。",
+    "default": 7
+  },
+  "cache_cleanup_enabled": {
+    "description": "启用每日自动清理",
+    "type": "bool",
+    "hint": "每天在指定时间清理过期缓存与孤儿文件。",
+    "default": true
+  },
+  "cache_cleanup_hour": {
+    "description": "每日清理小时",
+    "type": "int",
+    "hint": "0-23，配合分钟组成每日清理时刻。",
+    "default": 3
+  },
+  "cache_cleanup_minute": {
+    "description": "每日清理分钟",
+    "type": "int",
+    "hint": "0-59。",
+    "default": 30
+  },
+  "cache_timezone": {
+    "description": "清理时区",
+    "type": "string",
+    "hint": "IANA 时区名，例如 Asia/Shanghai。",
+    "default": "Asia/Shanghai"
   }
 }

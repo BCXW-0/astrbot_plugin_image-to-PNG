@@ -4,12 +4,12 @@
 
 # astrbot_plugin_image_to_png
 
-_✨ 图片格式兼容插件：非 PNG/JPEG 自动转 PNG，GIF 动图展开为逐帧拼贴 ✨_
+_✨ 图片格式兼容插件：非 PNG/JPEG 自动转 PNG，GIF 动图展开为逐帧拼贴，哈希缓存加速重复表情包 ✨_
 
 [![License](https://img.shields.io/badge/License-MIT-green.svg)](LICENSE)
 [![Python 3.10+](https://img.shields.io/badge/Python-3.10%2B-blue.svg)](https://www.python.org/)
 [![AstrBot](https://img.shields.io/badge/AstrBot-4.16%2B-orange.svg)](https://github.com/AstrBotDevs/AstrBot)
-[![Version](https://img.shields.io/badge/Version-1.1.0-brightgreen.svg)](https://github.com/BCXW-0/astrbot_plugin_image-to-PNG)
+[![Version](https://img.shields.io/badge/Version-1.2.0-brightgreen.svg)](https://github.com/BCXW-0/astrbot_plugin_image-to-PNG)
 [![GitHub](https://img.shields.io/badge/作者-Xiawan-blue)](https://github.com/BCXW-0)
 
 </div>
@@ -37,6 +37,8 @@ _✨ 图片格式兼容插件：非 PNG/JPEG 自动转 PNG，GIF 动图展开为
 2. **PNG / JPEG 原样放行**
 3. **其他格式统一转为 PNG**
 4. **GIF / 动态 WebP 展开为逐帧拼贴静态图**（保留动画过程信息）
+5. **按内容哈希缓存转换结果**，重复表情包直接复用
+6. **每日定时清理过期缓存**
 
 安装后通常无需额外操作，开箱即用。
 
@@ -54,16 +56,17 @@ _✨ 图片格式兼容插件：非 PNG/JPEG 自动转 PNG，GIF 动图展开为
 - 默认标注帧号与时长（如 `#3 80ms`）
 - 帧数过多时自动均匀采样，避免图片过大
 
+### 🗂️ 哈希缓存（v1.2.0）
+- 对聊天中获取到的原始图片内容计算 **SHA256**
+- 再结合当前转换参数生成缓存键
+- **相同表情包重复出现**时，直接命中缓存，跳过再次解码/拼贴
+- 缓存文件持久化存放，不会在单次消息结束后被临时清理误删
+- 支持查看缓存状态、手动清理、每日自动清理
+
 ### 🧠 更利于模型理解
 - 转换后是 Gemini 等模型可接受的 PNG
 - 拼贴图保留动画过程，而不是只看第一帧
 - 请求阶段可附带简短“动画帧说明”，提示模型按整张拼贴理解
-
-### 🧩 平台友好
-支持 AstrBot 常见消息平台（以实际适配器为准），特别适合：
-- QQ（aiocqhttp）表情包
-- 引用消息中的图片
-- 图片描述（image caption）链路
 
 ## 📦 安装
 
@@ -88,26 +91,35 @@ git clone https://github.com/BCXW-0/astrbot_plugin_image-to-PNG.git astrbot_plug
 
 ## 🚀 使用方法
 
-安装启用后即可自动工作，**无需命令**。
+安装启用后即可自动工作。
 
 典型场景：
 
 1. 用户发送 QQ GIF 表情包
-2. 插件检测到非 PNG/JPEG
-3. 自动转换为 PNG
-4. 若为动图，则生成逐帧拼贴图
+2. 插件计算图片内容哈希
+3. 若缓存未命中：转换/拼贴并写入缓存
+4. 若缓存命中：直接复用已转换 PNG
 5. 再交给 AstrBot 的识图 / LLM 流程
 
-你也可以在日志中看到类似信息：
+日志示例：
 
 ```text
 [图片转PNG] GIF 动图(12帧) -> 逐帧拼贴 PNG (...)
-[图片转PNG] 消息图片已转为 PNG: ...
+[图片转PNG] 缓存命中 content=ab12cd34ef56... options=1a2b3c4d5e6f (...)
 ```
+
+## ⌨️ 命令表
+
+| 命令 | 别名 | 说明 |
+|:----:|:----:|:-----|
+| `图片转png缓存状态` | `image2png_cache_status` / `图片转png缓存` | 查看缓存条目数、命中次数、占用、清理计划 |
+| `图片转png缓存清理` | `image2png_cache_clean` / `清理图片转png缓存` | 立即清理过期条目与孤儿文件 |
 
 ## ⚙️ 配置说明
 
 在 AstrBot 管理面板 → 插件配置中修改。
+
+### 基础转换
 
 | 配置项 | 类型 | 说明 | 默认值 |
 |:------:|:----:|:-----|:------:|
@@ -121,9 +133,21 @@ git clone https://github.com/BCXW-0/astrbot_plugin_image-to-PNG.git astrbot_plug
 | `max_cell_size` | 整数 | 拼贴中单帧最大边长（像素） | `256` |
 | `show_frame_labels` | 开关 | 是否显示帧编号和时长 | `true` |
 
+### 缓存与清理
+
+| 配置项 | 类型 | 说明 | 默认值 |
+|:------:|:----:|:-----|:------:|
+| `cache_enabled` | 开关 | 启用内容哈希缓存 | `true` |
+| `cache_ttl_days` | 整数 | 缓存保留天数（按最后访问时间） | `7` |
+| `cache_cleanup_enabled` | 开关 | 启用每日自动清理 | `true` |
+| `cache_cleanup_hour` | 整数 | 每日清理小时（0-23） | `3` |
+| `cache_cleanup_minute` | 整数 | 每日清理分钟（0-59） | `30` |
+| `cache_timezone` | 文本 | 清理时区（IANA，如 `Asia/Shanghai`） | `Asia/Shanghai` |
+
 ### 配置建议
 
-- **只想兼容 GIF、尽量少改图**：保持默认即可
+- **表情包很重复**：保持 `cache_enabled=true`，可显著减少重复转换开销
+- **磁盘紧张**：把 `cache_ttl_days` 调小（如 `3`），或更频繁手动清理
 - **动图很长 / 帧很多**：可把 `max_frames` 调到 `36` 或 `48`
 - **拼贴太大影响速度**：减小 `max_cell_size` 或 `max_frames`
 - **只要封面帧**：关闭 `animated_expand`
@@ -132,21 +156,41 @@ git clone https://github.com/BCXW-0/astrbot_plugin_image-to-PNG.git astrbot_plug
 
 ```text
 收到图片
-  ├─ 格式是 PNG / JPEG ？
-  │    └─ 是 → 原样提交给模型
+  ├─ 读取原始字节，计算 SHA256
+  ├─ 结合转换参数生成 cache_key
+  ├─ 缓存命中？
+  │    └─ 是 → 直接复用已转换 PNG
   └─ 否
-       ├─ 是动图（GIF / 动态 WebP 等）且开启 animated_expand
-       │    └─ 抽取帧 → 采样 → 生成逐帧拼贴 PNG
-       └─ 静态其他格式
-            └─ 转为单张 PNG
+       ├─ 格式是 PNG / JPEG 且非动图？
+       │    └─ 是 → 原样提交给模型（不写缓存）
+       └─ 否
+            ├─ 动图且开启 animated_expand
+            │    └─ 抽帧 → 采样 → 生成逐帧拼贴 PNG → 写入缓存
+            └─ 其他静态格式
+                 └─ 转为单张 PNG → 写入缓存
 ```
 
-处理时机：
+### 缓存键设计
+
+```text
+content_hash = SHA256(原始图片字节)
+options_sig  = SHA1(转换参数 JSON)[:12]
+cache_key    = SHA256(content_hash + ":" + options_sig)
+```
+
+因此：
+
+- **同一张表情包**重复发送 → 命中同一缓存
+- **同一张图但转换参数不同**（例如改了 max_frames）→ 使用不同缓存条目，互不影响
+
+### 处理时机
 
 1. **消息接入阶段**（高优先级）  
    改写消息链中的图片组件，尽量在压缩 / 图片描述前完成转换
 2. **LLM 请求阶段**（高优先级兜底）  
    再次检查 `ProviderRequest.image_urls`，覆盖第三方 Agent 等路径
+3. **每日定时清理**  
+   删除超过 TTL 的缓存条目、缺失文件索引、孤儿 PNG
 
 ## 📌 注意事项
 
@@ -154,11 +198,13 @@ git clone https://github.com/BCXW-0/astrbot_plugin_image-to-PNG.git astrbot_plug
    本插件采用“静态拼贴保留逐帧内容”的兼容方案，而不是继续提交 GIF。
 2. **超长动图会采样**  
    为控制体积和 token，超过 `max_frames` 时会均匀抽帧，并在说明中提示“已采样”。
-3. **透明表情包**  
+3. **缓存按内容识别，不依赖文件名/URL**  
+   即使平台每次给出不同临时路径，只要图片字节相同即可命中。
+4. **修改拼贴参数后不会复用旧结果**  
+   因为 `options_sig` 会变化，避免参数不一致导致“脏缓存”。
+5. **透明表情包**  
    默认尽量保留透明通道；若下游链路对 alpha 不友好，可关闭 `keep_alpha`。
-4. **不会修改用户原始聊天记录中的远端图片资源**  
-   转换结果写入 AstrBot 临时目录，并在事件结束后尽量清理。
-5. **依赖**  
+6. **依赖**  
    使用 AstrBot 环境中的 Pillow；一般无需额外安装依赖。
 
 ## 🐞 常见问题
@@ -166,27 +212,40 @@ git clone https://github.com/BCXW-0/astrbot_plugin_image-to-PNG.git astrbot_plug
 ### 1. 发了 GIF，模型还是答非所问？
 请确认：
 - 插件已启用
-- 日志中出现 `[图片转PNG]` 转换记录
+- 日志中出现 `[图片转PNG]` 转换或缓存命中记录
 - 图片描述提供商 / 主对话模型本身可用
 
-### 2. 拼贴图太糊 / 太小？
+### 2. 为什么第二次发同一表情包仍然慢？
+请检查：
+- `cache_enabled` 是否开启
+- 是否修改过转换参数（会生成新缓存键）
+- 缓存是否刚被清理
+
+可用命令：`图片转png缓存状态`
+
+### 3. 拼贴图太糊 / 太小？
 提高：
 - `max_cell_size`（如 `320` / `384`）
 - 或减少 `contact_sheet_columns`
 
-### 3. 拼贴图太大、请求变慢？
+### 4. 拼贴图太大、请求变慢？
 降低：
 - `max_frames`
 - `max_cell_size`
 
-### 4. 只想转格式，不要拼贴？
+### 5. 只想转格式，不要拼贴？
 关闭 `animated_expand`，将只转换第一帧为 PNG。
+
+### 6. 磁盘占用变高？
+- 调小 `cache_ttl_days`
+- 执行 `图片转png缓存清理`
+- 或关闭 `cache_enabled`
 
 ## 📁 文件结构
 
 ```text
 astrbot_plugin_image_to_png/
-├── main.py              # 插件主逻辑
+├── main.py              # 插件主逻辑（转换 + 缓存 + 清理）
 ├── metadata.yaml        # 插件元数据
 ├── _conf_schema.json    # 配置项定义
 ├── README.md            # 说明文档
@@ -194,14 +253,32 @@ astrbot_plugin_image_to_png/
 └── .gitignore
 ```
 
+运行时数据（示例）：
+
+```text
+data/plugin_data/astrbot_plugin_image_to_png/
+└── cache/
+    ├── index.json       # 缓存索引（哈希、路径、访问时间、命中次数）
+    └── files/
+        └── ab/
+            └── <cache_key>.png
+```
+
 ## 👥 贡献指南
 
 - 🌟 **Star 这个项目**（点右上角星星，感谢支持！）
 - 🐛 提交 Issue 反馈 bug
-- 💡 提出新功能建议（例如：导出多张关键帧图、自定义拼贴样式）
+- 💡 提出新功能建议（例如：导出多张关键帧图、自定义拼贴样式、LRU 容量上限）
 - 🔧 提交 Pull Request 改进代码
 
 ## 📜 更新日志
+
+### v1.2.0
+- 新增 **内容哈希缓存**：重复表情包直接复用转换结果
+- 缓存键结合原始内容 SHA256 与转换参数，避免脏缓存
+- 新增 **每日定时清理**（可配置时刻与时区）
+- 新增命令：`图片转png缓存状态` / `图片转png缓存清理`
+- 缓存文件持久化，避免被单次事件临时文件清理误删
 
 ### v1.1.0
 - 支持 GIF / 动态图展开为**逐帧拼贴静态 PNG**
