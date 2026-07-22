@@ -1,92 +1,154 @@
 {
   "enabled": {
-    "description": "启用图片格式转换",
+    "description": "启用插件",
     "type": "bool",
-    "hint": "开启后，非 PNG/JPEG 图片会在交给模型前自动转为 PNG。",
+    "hint": "总开关。关闭后不做任何图片预处理。",
     "default": true
   },
+  "preset": {
+    "description": "场景预设",
+    "type": "string",
+    "hint": "chat_sticker=聊天表情包；document_screenshot=文档截图；high_fidelity=高保真理解。预设会被下方精细项覆盖。",
+    "default": "chat_sticker"
+  },
   "convert_message_images": {
-    "description": "转换消息中的图片",
+    "description": "转换消息图片",
     "type": "bool",
-    "hint": "在收到消息时尽早转换，可避免图片描述/压缩阶段因 GIF 等格式失败。",
+    "hint": "收到消息时尽早转换，避免图片描述阶段失败。",
     "default": true
   },
   "convert_request_images": {
-    "description": "转换请求中的图片",
+    "description": "转换请求图片",
     "type": "bool",
-    "hint": "在 LLM 请求阶段再次检查 image_urls，作为兜底。",
+    "hint": "LLM 请求阶段再次检查 image_urls，作为兜底。",
     "default": true
   },
-  "keep_alpha": {
-    "description": "保留透明通道",
+  "model_adaptive": {
+    "description": "模型能力自适应",
     "type": "bool",
-    "hint": "转为 PNG 时尽量保留透明度；关闭则统一铺白底。",
+    "hint": "根据当前对话模型能力决定是否透传 GIF/WebP；Gemini 等默认不透传 GIF。",
     "default": true
   },
-  "animated_expand": {
-    "description": "动图展开为逐帧拼贴",
+  "fail_antihallucination": {
+    "description": "失败防幻觉提示",
     "type": "bool",
-    "hint": "开启后，GIF/动态 WebP 会按时间顺序展开成一张包含多帧的静态拼贴 PNG，便于模型理解动画内容。关闭则只取第一帧。",
+    "hint": "图片读取/转换失败时，向模型注入“不要臆测图片内容”的约束。",
     "default": true
+  },
+  "animated_mode": {
+    "description": "动图策略",
+    "type": "string",
+    "hint": "contact_sheet=逐帧拼贴；key_frames=关键帧拼贴；first_frame=仅首帧。",
+    "default": "contact_sheet"
   },
   "max_frames": {
     "description": "最多保留帧数",
     "type": "int",
-    "hint": "动图超过该帧数时会均匀采样，避免拼贴图过大。",
+    "hint": "contact_sheet 超过该帧数时均匀采样。",
     "default": 24
   },
   "contact_sheet_columns": {
     "description": "拼贴列数",
     "type": "int",
-    "hint": "逐帧拼贴图的列数，从左到右、从上到下排列。",
     "default": 4
   },
   "max_cell_size": {
     "description": "单帧最大边长",
     "type": "int",
-    "hint": "拼贴中每一帧缩放到该边长以内（像素）。",
     "default": 256
   },
   "show_frame_labels": {
     "description": "显示帧编号",
     "type": "bool",
-    "hint": "在每帧下方标注原始帧号和时长，帮助模型理解顺序。",
+    "default": true
+  },
+  "keep_alpha": {
+    "description": "保留透明通道",
+    "type": "bool",
+    "hint": "输出 PNG 时尽量保留透明度。",
+    "default": true
+  },
+  "output_format": {
+    "description": "输出格式",
+    "type": "string",
+    "hint": "png 或 jpeg。",
+    "default": "png"
+  },
+  "jpeg_quality": {
+    "description": "JPEG 质量",
+    "type": "int",
+    "hint": "仅 output_format=jpeg 时生效，40-95。",
+    "default": 85
+  },
+  "max_source_side": {
+    "description": "源图最大边长",
+    "type": "int",
+    "hint": "超过则先缩小，防止超大图拖慢请求。",
+    "default": 2048
+  },
+  "max_source_bytes_mb": {
+    "description": "源图最大体积(MB)",
+    "type": "int",
+    "default": 15
+  },
+  "strip_metadata": {
+    "description": "去除元数据",
+    "type": "bool",
+    "hint": "转换时剥离 EXIF 等元数据。",
     "default": true
   },
   "cache_enabled": {
-    "description": "启用哈希缓存",
+    "description": "启用缓存",
     "type": "bool",
-    "hint": "按图片内容 SHA256 + 转换参数识别重复表情包，命中则直接复用已转换 PNG。",
     "default": true
   },
   "cache_ttl_days": {
     "description": "缓存保留天数",
     "type": "int",
-    "hint": "以最后访问时间为准，超过该天数的缓存会在定时/手动清理时删除。",
     "default": 7
   },
-  "cache_cleanup_enabled": {
-    "description": "启用每日自动清理",
+  "cache_max_entries": {
+    "description": "缓存最大条目数",
+    "type": "int",
+    "hint": "超出后按 LRU 淘汰。",
+    "default": 500
+  },
+  "cache_max_mb": {
+    "description": "缓存最大占用(MB)",
+    "type": "int",
+    "hint": "超出后按 LRU 淘汰。",
+    "default": 512
+  },
+  "near_duplicate_enabled": {
+    "description": "近重复表情识别",
     "type": "bool",
-    "hint": "每天在指定时间清理过期缓存与孤儿文件。",
+    "hint": "开启后，尺寸/压缩略有差异的相同表情也可能命中缓存。",
+    "default": true
+  },
+  "near_duplicate_threshold": {
+    "description": "近重复阈值",
+    "type": "int",
+    "hint": "感知哈希汉明距离阈值，越小越严格，推荐 3-6。",
+    "default": 5
+  },
+  "cache_cleanup_enabled": {
+    "description": "启用每日清理",
+    "type": "bool",
     "default": true
   },
   "cache_cleanup_hour": {
     "description": "每日清理小时",
     "type": "int",
-    "hint": "0-23，配合分钟组成每日清理时刻。",
     "default": 3
   },
   "cache_cleanup_minute": {
     "description": "每日清理分钟",
     "type": "int",
-    "hint": "0-59。",
     "default": 30
   },
   "cache_timezone": {
     "description": "清理时区",
     "type": "string",
-    "hint": "IANA 时区名，例如 Asia/Shanghai。",
     "default": "Asia/Shanghai"
   }
 }
