@@ -101,7 +101,8 @@ git clone https://github.com/BCXW-0/astrbot_plugin_image-to-PNG.git astrbot_plug
 1. 不支持 GIF 的模型无法“真动画播放”，拼贴是兼容方案。  
 2. 修改动图策略/帧数等参数后，会生成新缓存，不会误用旧结果。  
 3. 近重复识别是近似匹配，必要时可关闭或调低阈值。  
-4. 一般无需额外依赖，使用 AstrBot 自带 Pillow 即可。
+4. 升级后会自动清理与当前转换参数不兼容的旧缓存，无需手工处理。
+5. 一般无需额外依赖，使用 AstrBot 自带 Pillow 即可。
 
 ## 🐞 常见问题
 

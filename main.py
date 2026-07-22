@@ -105,11 +105,6 @@ class ImageToPngPlugin(Star):
             self.animated_mode = "contact_sheet"
         if self.animated_mode in {"false", "0", "off", "none"}:
             self.animated_mode = "first_frame"
-        # backward compat with old animated_expand
-        if "animated_expand" in (self.config or {}) and self._cfg("animated_mode", None) is None:
-            self.animated_mode = (
-                "contact_sheet" if bool(self._cfg("animated_expand", True)) else "first_frame"
-            )
 
         self.max_frames = max(1, int(self._cfg("max_frames", preset["max_frames"]) or preset["max_frames"]))
         self.contact_sheet_columns = max(1, int(self._cfg("contact_sheet_columns", 4) or 4))
@@ -224,6 +219,7 @@ class ImageToPngPlugin(Star):
         self.cache_dir.mkdir(parents=True, exist_ok=True)
         self.cache_files_dir.mkdir(parents=True, exist_ok=True)
         await self._load_index()
+        await self._migrate_cache_index()
         await self._load_stats()
         if self.cache_cleanup_enabled:
             self._cleanup_task = asyncio.create_task(self._cleanup_loop())
@@ -651,17 +647,86 @@ class ImageToPngPlugin(Star):
                 self._index = {"version": CACHE_INDEX_VERSION, "entries": {}}
                 return
             try:
-                data = json.loads(self.cache_index_path.read_text(encoding="utf-8"))
+                raw = self.cache_index_path.read_text(encoding="utf-8-sig")
+                data = json.loads(raw)
                 entries = data.get("entries") if isinstance(data, dict) else {}
                 if not isinstance(entries, dict):
                     entries = {}
                 self._index = {
-                    "version": int((data or {}).get("version") or CACHE_INDEX_VERSION),
+                    "version": int((data or {}).get("version") or 1),
                     "entries": entries,
                 }
             except Exception as exc:  # noqa: BLE001
                 logger.warning("[图片转PNG] 读取缓存索引失败，将重建: %s", exc)
                 self._index = {"version": CACHE_INDEX_VERSION, "entries": {}}
+
+    async def _migrate_cache_index(self) -> None:
+        """清理旧版缓存冲突项：失效文件、过期参数签名、孤儿文件。"""
+        removed = 0
+        freed = 0
+        async with self._cache_lock:
+            entries = self._index.setdefault("entries", {})
+            alive_paths: set[str] = set()
+            for key, item in list(entries.items()):
+                if not isinstance(item, dict):
+                    entries.pop(key, None)
+                    removed += 1
+                    continue
+                path = str(item.get("path") or "")
+                options_sig = str(item.get("options_sig") or "")
+                missing = not path or not os.path.exists(path)
+                stale_options = bool(options_sig) and options_sig != self._options_sig
+                # 旧版索引可能无 options_sig / phash；参数已变的条目不可安全复用
+                if missing or stale_options:
+                    if path and os.path.exists(path):
+                        try:
+                            freed += os.path.getsize(path)
+                            os.remove(path)
+                        except OSError:
+                            pass
+                    entries.pop(key, None)
+                    removed += 1
+                    continue
+                # normalize fields for v2
+                item.setdefault("phash", None)
+                item.setdefault("options_sig", self._options_sig)
+                item.setdefault("hit_count", 0)
+                alive_paths.add(os.path.abspath(path))
+
+            # orphan files
+            if self.cache_files_dir.exists():
+                for file_path in self.cache_files_dir.rglob("*"):
+                    if not file_path.is_file():
+                        continue
+                    abs_path = str(file_path.resolve())
+                    if abs_path not in alive_paths:
+                        try:
+                            freed += file_path.stat().st_size
+                            file_path.unlink(missing_ok=True)
+                            removed += 1
+                        except OSError:
+                            pass
+
+            for sub in sorted(self.cache_files_dir.glob("*"), reverse=True):
+                if sub.is_dir():
+                    try:
+                        next(sub.iterdir())
+                    except StopIteration:
+                        try:
+                            sub.rmdir()
+                        except OSError:
+                            pass
+
+            self._index["version"] = CACHE_INDEX_VERSION
+            await self._save_index_unlocked()
+
+        if removed:
+            logger.info(
+                "[图片转PNG] 缓存迁移完成: removed=%s freed≈%s remaining=%s",
+                removed,
+                freed,
+                len(self._index.get("entries", {})),
+            )
 
     async def _save_index_unlocked(self) -> None:
         self.cache_dir.mkdir(parents=True, exist_ok=True)
@@ -678,7 +743,7 @@ class ImageToPngPlugin(Star):
                 self._stats = self._default_stats()
                 return
             try:
-                data = json.loads(self.stats_path.read_text(encoding="utf-8"))
+                data = json.loads(self.stats_path.read_text(encoding="utf-8-sig"))
                 base = self._default_stats()
                 if isinstance(data, dict):
                     base.update({k: data.get(k, v) for k, v in base.items()})
